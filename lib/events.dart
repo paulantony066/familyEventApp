@@ -1,4 +1,6 @@
 class Event{
-  final String name;
-  Event(this.name);
+  final String title;
+  const Event(this.title);
+  @override
+  String toString() => title;
 }

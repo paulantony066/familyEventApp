@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import 'events.dart';
@@ -18,17 +21,35 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  DateTime today = DateTime.now();
-  DateTime? _selectedDay;
-  Map<DateTime, List<Event>> events = {};
+  DateTime _focusedDay = DateTime.now();
+  late DateTime _selectedDate ;
   late final ValueNotifier<List<Event>> _selectedEvent;
-  TextEditingController eventController = TextEditingController();
-  void _onDaySelected(DateTime day,DateTime focusedDay){
-    setState(() {
-      today = day;
-
-    });
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _selectedDate=_focusedDay;
+    _selectedEvent = ValueNotifier(_getEventsForDay(_selectedDate));
   }
+  Map<DateTime, List<Event>> events={};
+
+  List<Event> _getEventsForDay(DateTime day){
+    //get events from selected date
+      return events[day]?? [];
+  }
+  TextEditingController eventController = TextEditingController();
+  void _onDaySelected(DateTime selectedDay,DateTime focusedDay){
+    if(!isSameDay(_selectedDate, selectedDay)) {
+      setState(() {
+        _selectedDate=selectedDay;
+        _focusedDay = focusedDay;
+        _selectedEvent.value=_getEventsForDay(selectedDay);
+      });
+    }
+  }
+
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,9 +81,22 @@ class _MyAppState extends State<MyApp> {
                         backgroundColor: Colors.grey[200]
                       ),
                       onPressed: (){
-                        //passing event and day into list map variable
-                        events.addAll({_selectedDay!: [Event(eventController.text)]});
-                        Navigator.of(context).pop();
+                        if(eventController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: Colors.grey[300],
+                                content: Text("Field is empty",
+                                  style: TextStyle(color: Colors.black,
+                                      fontWeight: FontWeight.bold),),
+                                duration: Duration(seconds: 2),
+                              ));
+                        }
+
+                          //adds event to list map
+                          events.addAll({_selectedDate!: [Event(eventController.text)]});
+                          Navigator.of(context).pop();
+                          _selectedEvent.value = _getEventsForDay(_selectedDate!);
+
                       },
                       child: Text("ADD EVENT",style: TextStyle(color: Colors.black),
                       ),
@@ -74,29 +108,54 @@ class _MyAppState extends State<MyApp> {
           child: Icon(Icons.add),
           backgroundColor: Colors.grey[200],
           ),
-        body: content(),
+        body: Column(
+          children: [
+          Text("selected day : "+_focusedDay.toString().split(" ")[0]),
+              TableCalendar(
+              headerStyle: HeaderStyle( titleCentered: true,),
+              availableGestures: AvailableGestures.all,
+              focusedDay: _focusedDay,
+              calendarFormat: _calendarFormat,
+              firstDay: DateTime.utc(2000,01,01),
+              lastDay: DateTime.utc(2050,12,12),
+              onDaySelected: _onDaySelected,
+              selectedDayPredicate: (day)=>isSameDay(_selectedDate, day),
+              onFormatChanged: (format){
+                if(_calendarFormat!=format)
+                {
+                  setState(() {
+                    _calendarFormat=format;
+                  });
+                }
+              },
+              onPageChanged: (focusedDay){
+                _focusedDay=focusedDay;
+              },
+            ),
+
+
+          Expanded(
+            child: ValueListenableBuilder<List<Event>>(
+                valueListenable: _selectedEvent, builder: (context, value,_){
+              return ListView.builder(itemCount: value.length,itemBuilder: (context,index){
+                return Container(
+                  margin: EdgeInsets.symmetric(horizontal: 12,vertical: 4),
+                  decoration: BoxDecoration(border: Border.all(),borderRadius: BorderRadius.circular(12.00)),
+                  child: ListTile(
+                    onTap: ()=>print(""),
+                    title: Text('${value[index]}'),) ,
+                );
+              });
+            }),
+          )
+
+
+
+          ],
+        ),
       );
   }
 
-  Widget content(){
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        children: [
-          Text("selected day : "+today.toString().split(" ")[0]),
-          Container(
-            child: TableCalendar(
-                headerStyle: HeaderStyle(formatButtonVisible: false, titleCentered: true,),
-                availableGestures: AvailableGestures.all,
-                selectedDayPredicate: (day)=>isSameDay(day, today),
-                focusedDay: today,
-                firstDay: DateTime.utc(2000,01,01),
-                lastDay: DateTime.utc(2050,12,12),
-                onDaySelected: _onDaySelected,),
-          ),
-        ],
-      ),
-    );
-  }
+
 }
 
